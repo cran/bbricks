@@ -19,9 +19,9 @@ inferenceJointGaussian(x2, mu, Sigma = NULL, Precision = NULL)
 A named list containing the conditional mean and covariance matrix.
 }
 \description{
-For the model structure \cr
-   x1,x2|mu,Sigma ~ Gaussian(mu,Sigma) \cr
-   x1|x2,mu,Sigma ~ Gaussian(mu12,Sigma12)
+For the model structure
+   \deqn{x1,x2|mu,Sigma ~ Gaussian(mu,Sigma)}
+   \deqn{x1|x2,mu,Sigma ~ Gaussian(mu12,Sigma12)}
 }
 \examples{
 tmp <- matrix(runif(100),20,5)
@@ -30,7 +30,4 @@ P <- solve(S)
 m <- runif(5)
 x2 <- runif(3)
 inferenceJointGaussian(x2 = x2,mu = m,Precision = P)
-}
-\seealso{
-\code{\link{linearGaussian}}
 }

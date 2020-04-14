@@ -10,38 +10,77 @@ knitr::opts_chunk$set(
 #  devtools::install_github("chenhaotian/Bayesian-Bricks")
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Bayesian linear regression
+#  ## Gibbs sampling for hierarchical linear regression
 #  
 #  library(bbricks)
-#  
-#  ## lrData is a list of two elements. lrData$x is the sample set of the dependent variable; lrData$X is the sample set of the independent variable
-#  ## see ?lrData for details
-#  data(lrData)
-#  X <- lrData$X                           #a matrix of 1 column
-#  x <- lrData$x                           #a numeric vector
-#  ## task 1. update the prior into posterior using X and x
-#  obj <- GaussianNIG(gamma=list(m=0,V=1,a=1,b=0)) #create a GaussianNIG object
-#  ss <- sufficientStatistics(obj = obj,X=X,x=x)   #the sufficient statistics of X and x
-#  posterior(obj = obj,ss = ss)                    #add the infomation to the posterior
-#  ## task 2. get MAP estimate of beta and sigma^2 from the posterior
-#  bsMAP <- MAP(obj)                               #get the MAP estimate of beta and sigma^2
-#  bsMAP                                           #print the MAP estimate
-#  ## plot the MAP estimate of the regression line
-#  plot(X,X%*%bsMAP$betaMAP,type = "l")
-#  points(X,x,pch=20)
-#  ## task 3. calculate marginal likelihood
-#  ## generate some new data
-#  Xnew <- matrix(runif(3,min=0,max=),ncol=1)
-#  xnew <- Xnew*0.2+rnorm(3,sd=10)
-#  marginalLikelihood(obj = obj,X=x,x=x,LOG = TRUE)
-#  ## task 4. calculate the posterior prediction
-#  ## say we want to predict x at the location X=100
-#  predictedSamples <- rPosteriorPredictive(obj = obj,X=matrix(101,ncol = 1),n=1000)
-#  ## histogram of the prediction
-#  hist(predictedSamples)
-#  ## the mean and standard devition of the prediction
-#  mean(predictedSamples)
-#  sd(predictedSamples)
+#  ## load some hierarchical linear regression data
+#  ## hlrData is a list of 3 numeric vectors
+#  ## see ?hlrData for details
+#  data(hlrData)
+#  x <- hlrData$mathScore                    #math score as the dependent variable
+#  X <- cbind(1,hlrData$socioeconomicStatus) #socioeconomic status as the independt variable
+#  js <- hlrData$schoolID                    #school ID as the group IDs.
+#  J <- max(js)
+#  ## Initialization----------------------------------------------
+#  ## initialize the Markov blanket of mu and Sigma
+#  ## the prior parameters are: m=0, k=0.0001, v=3, S=diag(1)
+#  objmS <- GaussianNIW(gamma = list(m =c(mean(hlrData$mathScore),0),k=0.0001,v=3,S=diag(2)))
+#  ## initialize the Markov blanket of sigma^2
+#  ## the prior parameters are: vs=2, Ss=diag(1)
+#  objs <- GaussianInvWishart(gamma = list(mu=0,v=2,S=diag(1)))
+#  ## initialize mu and Sigma by sampling from the prior
+#  muSigma <- rPosterior(objmS)
+#  ## initialize sigma^2 by sampling from the prior
+#  sigma2 <- rPosterior(objs)
+#  betaJ <- matrix(0,J,2)                  #place-holder the beta_j, j=1:J
+#  epsilon <- x                            #place-holder for the random noises
+#  ## Main Gibbs loop---------------------------------------------
+#  maxit <- 100                           #number of sampling iterations
+#  burnin <- 50                           #number of burn-in samples
+#  meanBeta <- betaJ                      #place-hoder for the sample means of beta
+#  it <- 1
+#  pb <- txtProgressBar(min = 0,max = maxit,style = 3)
+#  while(it<=maxit){
+#      ## Step1: sample beta_j, j in 1:100
+#      for(j in 1L:J){
+#          objb <- LinearGaussianGaussian(gamma=list(Sigma=sigma2,m=muSigma$mu,S=muSigma$Sigma))
+#          idx <- js == j
+#          ss <- sufficientStatistics(obj = objb,x=x[idx],A=X[idx,,drop=FALSE])
+#          posterior(obj = objb,ss = ss)
+#          betaJ[j,] <- rPosterior(objb)
+#      }
+#      ## calculate the sample mean
+#      if(it>burnin) meanBeta <- meanBeta+betaJ/(maxit-burnin)
+#      ## Step2: sample mu and Sigma
+#      ssmS <- sufficientStatistics(obj = objmS,x=betaJ)
+#      posterior(obj = objmS,ss = ssmS)
+#      muSigma <- rPosterior(obj = objmS)
+#      ## Step3: sample sigma^2
+#      for(j in 1L:J){
+#          idx <- js == j
+#          epsilon[idx] <- x[idx]-X[idx,,drop=FALSE]%*%betaJ[j,]
+#      }
+#      sss <- sufficientStatistics(obj = objs,x=epsilon)
+#      posterior(obj = objs,ss = sss)
+#      sigma2 <- rPosterior(objs)
+#      ## increase iteration counter
+#      it <- it+1
+#      setTxtProgressBar(pb,it)
+#      ## if continue sampling, then discard the information in objmS and objs
+#      ## to make room for the new information in the next iteration.
+#      if(it < maxit){
+#          posteriorDiscard(obj = objmS,ss = ssmS)
+#          posteriorDiscard(obj = objs,ss = sss)
+#      }
+#  }
+#  ## plot the result
+#  ## gray lines are the betas of each school
+#  ## black line is the beta for all the data as a whole
+#  plot(x=0, xlim = range(0.2,0.8),ylim = c(20,35),xlab = "socioeconomic status",ylab = "math score")
+#  for(j in 1L:J)
+#      abline(a=betaJ[j,2],b=betaJ[j,1],col="gray")
+#  allSchools <- lm(x~X-1)$coefficients
+#  abline(a=allSchools[2],b=allSchools[1],lwd=3)
 #  
 
 ## ----eval=FALSE---------------------------------------------------------------
@@ -382,4 +421,39 @@ knitr::opts_chunk$set(
 #      names(tmp)[which.max(tmp)]
 #  })
 #  plot(x=x[,1],y=x[,2],col=uBest)
+
+## ----eval=FALSE---------------------------------------------------------------
+#  ## Bayesian linear regression
+#  
+#  library(bbricks)
+#  
+#  ## lrData is a list of two elements. lrData$x is the sample set of the dependent variable; lrData$X is the sample set of the independent variable
+#  ## see ?lrData for details
+#  data(lrData)
+#  X <- lrData$X                           #a matrix of 1 column
+#  x <- lrData$x                           #a numeric vector
+#  ## task 1. update the prior into posterior using X and x
+#  obj <- GaussianNIG(gamma=list(m=0,V=1,a=1,b=0)) #create a GaussianNIG object
+#  ss <- sufficientStatistics(obj = obj,X=X,x=x)   #the sufficient statistics of X and x
+#  posterior(obj = obj,ss = ss)                    #add the infomation to the posterior
+#  ## task 2. get MAP estimate of beta and sigma^2 from the posterior
+#  bsMAP <- MAP(obj)                               #get the MAP estimate of beta and sigma^2
+#  bsMAP                                           #print the MAP estimate
+#  ## plot the MAP estimate of the regression line
+#  plot(X,X%*%bsMAP$betaMAP,type = "l")
+#  points(X,x,pch=20)
+#  ## task 3. calculate marginal likelihood
+#  ## generate some new data
+#  Xnew <- matrix(runif(3,min=0,max=),ncol=1)
+#  xnew <- Xnew*0.2+rnorm(3,sd=10)
+#  marginalLikelihood(obj = obj,X=x,x=x,LOG = TRUE)
+#  ## task 4. calculate the posterior prediction
+#  ## say we want to predict x at the location X=100
+#  predictedSamples <- rPosteriorPredictive(obj = obj,X=matrix(101,ncol = 1),n=1000)
+#  ## histogram of the prediction
+#  hist(predictedSamples)
+#  ## the mean and standard devition of the prediction
+#  mean(predictedSamples)
+#  sd(predictedSamples)
+#  
 

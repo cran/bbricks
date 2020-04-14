@@ -1,3 +1,5 @@
+
+
 #' Samples from a mixture model
 #'
 #' A matrix of 2-dimensional Gaussian mixture samples, the samples came from 4 different Gaussian distributions
@@ -55,6 +57,23 @@
 #' }
 "lrData"
 
+#' @title Samples from a hierarchical linear model
+#' @description
+#' The data was part of the 2002 Educational Longitudinal Study (ELS), a survey of students from a large sample of schools across the United States. This dataset includes a population of schools as well as a population of students within each school.
+#' @docType data
+#'
+#' @usage data(lrData)
+#'
+#' @format A list of three elements:
+#' \describe{
+#'   \item{mathScore}{numeric, the mathScore of each student}
+#'   \item{socioeconomicStatus}{numeric, the socioeconomic status score of each student}
+#'   \item{schoolID}{integer, the school ID of each student}
+#' }
+#' @references Hoff, Peter D. A first course in Bayesian statistical methods. Vol. 580. New York: Springer, 2009.
+"hlrData"
+
+
 #' farm ads data
 #'
 #' A subset of farm ads data from https://archive.ics.uci.edu/ml/datasets/Farm+Ads
@@ -82,3 +101,6 @@
 #' @format A list of 20 character vectors.
 #' @references Johnson, Valen E., and James H. Albert. Ordinal data modeling. Springer Science & Business Media, 2006.
 "cancerData"
+
+
+
