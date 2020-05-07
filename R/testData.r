@@ -1,3 +1,4 @@
+
 #' Samples from a mixture model
 #'
 #' A matrix of 2-dimensional Gaussian mixture samples, the samples came from 4 different Gaussian distributions
@@ -19,8 +20,8 @@
 #'
 #' @format A list of two elements:
 #' \describe{
-#'   \item{x}{matrix, 2-dimensional Gaussian samples, each row is a sample}
-#'   \item{groupLabel}{integer, the group label of each Gaussian sample}
+#'   \item{x}{: matrix, 2-dimensional Gaussian samples, each row is a sample}
+#'   \item{groupLabel}{: integer, the group label of each Gaussian sample}
 #' }
 "mmhData"
 
@@ -32,11 +33,11 @@
 #'
 #' @usage data(mmhhData)
 #'
-#' @format A list of two elements:
+#' @format A list of three elements:
 #' \describe{
-#'   \item{x}{matrix, 2-dimensional Gaussian samples, each row is a sample}
-#'   \item{groupLabel}{integer, the group label of each Gaussian sample}
-#'   \item{subGroupLabel}{integer, the subgroup label of each Gaussian sample}
+#'   \item{x}{: matrix, 2-dimensional Gaussian samples, each row is a sample}
+#'   \item{groupLabel}{: integer, the group label of each Gaussian sample}
+#'   \item{subGroupLabel}{: integer, the subgroup label of each Gaussian sample}
 #' }
 "mmhhData"
 
@@ -50,8 +51,8 @@
 #'
 #' @format A list of two elements:
 #' \describe{
-#'   \item{x}{numeric, linear samples}
-#'   \item{X}{matrix, the "locations" of the linear samples}
+#'   \item{x}{: numeric, linear samples}
+#'   \item{X}{: matrix, the "locations" of the linear samples}
 #' }
 "lrData"
 
@@ -64,9 +65,9 @@
 #'
 #' @format A list of three elements:
 #' \describe{
-#'   \item{mathScore}{numeric, the mathScore of each student}
-#'   \item{socioeconomicStatus}{numeric, the socioeconomic status score of each student}
-#'   \item{schoolID}{integer, the school ID of each student}
+#'   \item{mathScore}{: numeric, the mathScore of each student}
+#'   \item{socioeconomicStatus}{: numeric, the socioeconomic status score of each student}
+#'   \item{schoolID}{: integer, the school ID of each student}
 #' }
 #' @references Hoff, Peter D. A first course in Bayesian statistical methods. Vol. 580. New York: Springer, 2009.
 "hlrData"
@@ -82,8 +83,8 @@
 #'
 #' @format A list of two elements:
 #' \describe{
-#'   \item{word}{character, the words}
-#'   \item{document}{integer, document id of each word}
+#'   \item{word}{: character, the words}
+#'   \item{document}{: integer, document id of each word}
 #' }
 #' @source \href{https://archive.ics.uci.edu/ml/datasets/Farm+Ads}{Farm-Ads}
 "farmadsData"
@@ -102,3 +103,19 @@
 
 
 
+#' @title Samples from a hidden Markov model
+#' @description
+#' Random samples generated from a Hidden Markov Model (HMM) with 3 hidden states. The initial distribution is c(0.2,0.6,0.2), the transition matrix is matrix(c(0.9, 0.04, 0.06, 0.06, 0.9, 0.07, 0.04, 0.06, 0.87),3,3).
+#'
+#' @docType data
+#'
+#' @usage data(hmmData)
+#'
+#' @format A list of four elements:
+#' \describe{
+#'   \item{x}{: matrix, two dimensional Gaussian observations. The observations are split into 'Nsegs' segment, see 'Nsegs' and 'breaks' below.}
+#'   \item{z}{: integer vector, the real hidden states.}
+#'   \item{Nsegs}{: integer, the number of segments.}
+#'   \item{breaks}{: integer vector, the starting and ending locations of the segments. The ith segment start at breaks[i]+1, ends at breaks[i+1]}
+#' }
+"hmmData"

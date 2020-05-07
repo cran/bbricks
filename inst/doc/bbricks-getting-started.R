@@ -192,7 +192,7 @@ knitr::opts_chunk$set(
 #  ecMAP                                 #the MAP estimate of theta_z
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Sample cluster labels z from DP-MM using Gibbs sampling
+#  ## Learn DP-MM posteriors using Gibbs sampling
 #  
 #  library(bbricks)
 #  
@@ -247,7 +247,7 @@ knitr::opts_chunk$set(
 #  mmData <- mmData[-c(50,100,150,200),]
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Sample cluster labels k from HDP-MM using Gibbs sampling
+#  ## Learn HDP-MM posteriors using Gibbs sampling
 #  
 #  library(bbricks)
 #  
@@ -305,7 +305,7 @@ knitr::opts_chunk$set(
 #  plot(x=x[,1],y=x[,2],col=kBest)
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## HDP-LDA on the farm-ads corpus
+#  ## Learn HDP-LDA posteriors of the farm-ads corpus
 #  
 #  ## load a subset of farm ads data from https://archive.ics.uci.edu/ml/datasets/Farm+Ads
 #  ## see ?farmadsData for details
@@ -364,7 +364,7 @@ knitr::opts_chunk$set(
 #                        colors=RColorBrewer::brewer.pal(5, "Set1"))
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Sample cluster labels u from HDP2-MM using Gibbs sampling
+#  ## Learn HDP2-MM posteriors using Gibbs sampling
 #  
 #  library(bbricks)
 #  
@@ -425,7 +425,7 @@ knitr::opts_chunk$set(
 #  plot(x=x[,1],y=x[,2],col=uBest)
 
 ## ----eval=FALSE---------------------------------------------------------------
-#  ## Bayesian linear regression
+#  ## Learn posteriors of the Bayesian linear regression model
 #  
 #  library(bbricks)
 #  
@@ -457,5 +457,220 @@ knitr::opts_chunk$set(
 #  ## the mean and standard devition of the prediction
 #  mean(predictedSamples)
 #  sd(predictedSamples)
+#  
+
+## ----eval=FALSE---------------------------------------------------------------
+#  ## Learn HMM posteriors using single-move sampling
+#  
+#  library(bbricks)
+#  
+#  ## load some hidden markov data
+#  ## see ?hmmData for details
+#  data(hmmData)
+#  x <- hmmData$x
+#  Nsegs <- hmmData$Nsegs                  #number of segments
+#  breaks <- hmmData$breaks                #break index of the segments
+#  ## Step1: Initialization------------------------------------------
+#  ## create Categorical-Dirichlet object for pi0 and transition matrix
+#  K <- 3L
+#  allk <- 1L:K
+#  transitionObj <- replicate(K,CatDirichlet(gamma = list(alpha=1,uniqueLabels=allk)))
+#  piObj <- CatDirichlet(gamma = list(alpha=1,uniqueLabels=allk))
+#  ## create Gaussian-NIW object for observations
+#  obsObj <- replicate(K,GaussianNIW(gamma=list(m=c(0,0),k=0.001,v=3,S=diag(2))))
+#  ## place holder for the sampled hidden states
+#  z <- integer(nrow(x))
+#  ## observation sufficient statistics
+#  ssx <- sufficientStatistics(obj = obsObj[[1]],x=x,foreach = TRUE)
+#  ## initialize states with random assignment
+#  z <- sample(allk,length(z),replace = TRUE)
+#  for(i in 1L:Nsegs){
+#      segStart <- breaks[i]+1L
+#      segEnd <- breaks[i+1]
+#      for(j in segStart:segEnd){
+#          if(j==segStart) posterior(piObj,ss = z[j])
+#          else posterior(transitionObj[[z[j-1L]]],ss = z[j])
+#          posterior(obsObj[[z[j]]],ss = ssx[[j]])
+#      }
+#  }
+#  ## Step2: main Gibbs loop---------------------------------------------
+#  maxit <- 20
+#  it <- 1
+#  pb <- txtProgressBar(min = 0,max = maxit,style = 3)
+#  while(it<=maxit){
+#      ## for all segments
+#      for(i in 1L:Nsegs){
+#          segStart <- breaks[i]+1L
+#          segEnd <- breaks[i+1]
+#          for(j in segStart:segEnd){
+#              ## discard previous z
+#              if(j==segStart){
+#                  posteriorDiscard(piObj,ss = z[j])
+#              }else if(j==segEnd){
+#                  posteriorDiscard(transitionObj[[z[j-1L]]],ss = z[j])
+#              }else{
+#                  posteriorDiscard(transitionObj[[z[j-1L]]],ss = z[j])
+#                  posteriorDiscard(transitionObj[[z[j]]],ss = z[j+1L])
+#              }
+#              posteriorDiscard(obsObj[[z[j]]],ss = ssx[[j]])
+#              ## sample new z
+#              if(j==segStart)
+#                  pz <- dPosteriorPredictive(obj = piObj,x=allk,LOG = TRUE)
+#              else
+#                  pz <- dPosteriorPredictive(obj = transitionObj[[z[j-1L]]],x=allk,LOG = TRUE)
+#              if(j!=segEnd)
+#                  for(k in allk) pz[k] <- pz[k]+dPosteriorPredictive(obj = obsObj[[k]],x=x[j,,drop=FALSE],LOG = TRUE)+dPosteriorPredictive(obj = transitionObj[[k]],x=z[j+1L],LOG = TRUE)
+#              else
+#                  for(k in allk) pz[k] <- pz[k]+dPosteriorPredictive(obj = obsObj[[k]],x=x[j,,drop=FALSE],LOG = TRUE)
+#              pz <- exp(pz-logsumexp(pz))
+#              currentK <- sample.int(K,size=1,prob = pz)
+#              z[j] <- currentK
+#              ## update prior with newly sampled z
+#              if(j==segStart){
+#                  posterior(piObj,ss = currentK)
+#              }else if(j==segEnd){
+#                  posterior(transitionObj[[z[j-1L]]],ss = currentK)
+#              }else{
+#                  posterior(transitionObj[[z[j-1L]]],ss = currentK)
+#                  posterior(transitionObj[[currentK]],ss = z[j+1])
+#              }
+#              posterior(obsObj[[currentK]],ss = ssx[[j]])
+#          }
+#      }
+#      it <- it+1
+#      setTxtProgressBar(pb,it)
+#  }
+#  ## print the MAP estimates of the transition matrix
+#  for(k in allk) print(round(MAP(transitionObj[[k]]),2))
+#  ## print the MAP estimates of the observation distributions
+#  for(k in allk) print(MAP(obsObj[[k]]))
+#  ## MAP estimates of the initial state distribution pi0
+#  MAP(piObj)
+
+## ----eval=FALSE---------------------------------------------------------------
+#  ## Learn HDP-HMM posteriors using single-move sampling
+#  
+#  library(bbricks)
+#  
+#  source("Programs/Codes/Bayesian Nonparametrics/Dirichlet_Process.r")
+#  ## load some hidden markov data
+#  ## see ?hmmData for details
+#  data(hmmData)
+#  x <- hmmData$x
+#  Nsegs <- hmmData$Nsegs
+#  breaks <- hmmData$breaks
+#  ## Step1: Initialization------------------------------------------
+#  transitionObj <- HDP(gamma = list(gamma=1,alpha=1,j=1,H0aF="GaussianNIW",parH0=list(m=c(0,0),k=0.001,v=3,S=diag(2))))
+#  ## place holder for the sampled hidden states
+#  zk <- matrix(0L,ncol = 2,nrow = nrow(x))
+#  ## observation sufficient statistics
+#  ssx <- sufficientStatistics(obj = GaussianNIW(),x=x,foreach = TRUE)
+#  ## sample k from p(k|gamma,x)
+#  samplePi <- function(x,zkAfter){
+#      ## allK <- which(transitionObj$Z$Z1$gamma$nk>0)
+#      allK <- which(transitionObj$Z$Z1$gamma$nk>0) #all possible k
+#      if(length(allK)==0) return(transitionObj$Z$Z1$gamma$newLabel)
+#      ## p(k|pi) p(x|k) p(k_{2}|k)
+#      logp <- dPosteriorPredictive(transitionObj$Z$Z1,x=allK,LOG = TRUE) +
+#          vapply(allK,function(k){
+#              dPosteriorPredictive(transitionObj$X[[k]],x=x,LOG = TRUE)+
+#              dPosteriorPredictive(obj = transitionObj,z=zkAfter[1],k=zkAfter[2],j=k,LOG = FALSE)
+#          },FUN.VALUE = numeric(1))
+#  
+#      logp <- exp(logp-max(logp))
+#      allK[sample.int(length(allK),size = 1,prob = logp)]
+#  }
+#  ## sample z and k from p(z,k|gamma,alpha,x)
+#  sampleZK <- function(kBefore,zkAfter,x){
+#      ## p(z,k | k_{t-1}) p(x|k)
+#      probs <- dAllIndicators(obj = transitionObj,j=kBefore,x=x)
+#      ##
+#      allK <- unique(probs$k)
+#  
+#      ## p(k_{t+1} | k)
+#      p <- vapply(allK,function(k){
+#          if(k==transitionObj$Z$Z1$gamma$newLabel)
+#              dPosteriorPredictive(obj = transitionObj$Z$Z1,x=zkAfter[2],LOG = FALSE)
+#          else
+#              dPosteriorPredictive(obj = transitionObj,z=zkAfter[1],k=zkAfter[2],j=k,LOG = FALSE)
+#      },FUN.VALUE = numeric(1))
+#      idx <- sample.int(nrow(probs),size = 1,prob = p[match(probs$k,allK)]*probs$p)
+#      c(z=probs$z[idx],k=probs$k[idx])
+#  }
+#  ## initialize states with forward assignment
+#  for(i in 1L:Nsegs){
+#      segStart <- breaks[i]+1L
+#      segEnd <- breaks[i+1]
+#      for(j in segStart:segEnd){
+#          if(j==segStart){
+#              k <- rPosteriorPredictive(obj = transitionObj$Z$Z1,n=1)
+#              ## update initial and observation
+#              posterior(obj = transitionObj,ss=ssx[[j]],ss1=k,ss2=1L,j=k)
+#              zk[j,2] <- k
+#          }else{
+#              ## sample from the j(or k) th DP
+#              zk1 <- rPosteriorPredictive(obj = transitionObj,n=1,j=zk[j-1,2],x=x[j,,drop=FALSE])
+#              ## update transition and observation
+#              posterior(obj = transitionObj,ss = ssx[[j]],ss1=zk1[2],ss2=zk1[1],j=zk[j-1,2])
+#              ## write to book
+#              zk[j,] <- zk1
+#          }
+#      }
+#  }
+#  ## Step2: main Gibbs loop---------------------------------------------
+#  maxit <- 20
+#  it <- 1
+#  pb <- txtProgressBar(min = 0,max = maxit,style = 3)
+#  while(it<=maxit){
+#      ## for all segments
+#      for(i in 1L:Nsegs){
+#          segStart <- breaks[i]+1L
+#          segEnd <- breaks[i+1]
+#          for(j in segStart:segEnd){
+#              ## discard previous z
+#              if(j==segStart){
+#                  ## discard 1 obs 1 initial and 1 transition
+#                  posteriorDiscard(obj = transitionObj,ss=ssx[[j]],ss1=zk[j,2],ss2=1L,j=zk[j,2])
+#                  posteriorDiscard(obj = transitionObj,ss=NULL, ss1=zk[j+1,2],ss2=zk[j+1,1],j=zk[j,2])
+#                  ## sample new initial k
+#                  k <- samplePi(x=x[j,,drop=FALSE],zkAfter = zk[j+1,,drop=FALSE])
+#                  ## update prior with newly sampled k
+#                  posterior(obj = transitionObj,ss=ssx[[j]],ss1=k,ss2=1L,j=k)
+#                  posterior(obj = transitionObj,ss=NULL, ss1=zk[j+1,2],ss2=zk[j+1,1],j=k)
+#                  ## write to book
+#                  zk[j,2] <- k
+#              }else if(j==segEnd){
+#                  ## discard 1 obs and 1 transition
+#                  posteriorDiscard(obj = transitionObj,ss=ssx[[j]],ss1=zk[j,2],ss2=zk[j,1],j=zk[j-1,2])
+#                  ## sample new z k
+#                  zk1 <- rPosteriorPredictive(obj = transitionObj,n=1,x=x[j,,drop=FALSE],j=zk[j-1,2])
+#                  ## update prior with newly sampled z
+#                  posterior(obj = transitionObj,ss=ssx[[j]],ss1=zk1[2],ss2=zk1[1],j=zk[j-1,2])
+#                  ## write to book
+#                  zk[j,] <- zk1
+#              }else{
+#                  ## discard 2 transitions and 1 obs
+#                  posteriorDiscard(obj = transitionObj,ss=ssx[[j]],ss1=zk[j,2],ss2=zk[j,1],j=zk[j-1,2])
+#                  posteriorDiscard(obj = transitionObj,ss=NULL, ss1=zk[j+1,2],ss2=zk[j+1,1],j=zk[j,2])
+#                  ## sample new z k
+#                  zk1 <- sampleZK(kBefore = zk[j-1,2],zkAfter = zk[j+1,],x=x[j,,drop=FALSE])
+#                  ## update prior with newly sampled z k
+#                  posterior(obj = transitionObj,ss=ssx[[j]],ss1=zk1[2],ss2=zk1[1],j=zk[j-1,2])
+#                  posterior(obj = transitionObj,ss=NULL, ss1=zk[j+1,2],ss2=zk[j+1,1],j=zk1[2])
+#                  ## write to book
+#                  zk[j,] <- zk1
+#              }
+#          }
+#      }
+#      it <- it+1
+#      setTxtProgressBar(pb,it)
+#  }
+#  allK <- which(transitionObj$Z$Z1$gamma$nk>0)
+#  ## print the MAP estimates of the state transitions
+#  for(k in allK) print(vapply(split(MAP(transitionObj$Z$Z2[[k]]),f=transitionObj$Z$Z12map[[k]]),sum,numeric(1)))
+#  ## print the MAP estimates of the observation parameters
+#  for(k in allK) print(MAP(transitionObj$X[[k]]))
+#  ## print the MAP esitmate of the initial state distribution
+#  round(MAP(transitionObj$Z$Z1)[allK],2)
 #  
 
